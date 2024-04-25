@@ -1,0 +1,8 @@
+Flask
+numpy
+pandas
+opencv-python
+Pillow
+requests
+tensorflow==2.12.0
+keras

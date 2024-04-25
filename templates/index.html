@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Emotion Recognition</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Color Palette */
+        :root {
+            --dark-purple: #2C0847;
+            --light-purple: #A555EC;
+            --pink: #FA7268;
+            --yellow: #FFC857;
+            --white: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(to right, var(--dark-purple), var(--light-purple));
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.1);
+            width: 60%;
+        }
+
+        h1 {
+            color: var(--dark-purple);
+            font-weight: 700;
+        }
+
+        video {
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        #prediction {
+            font-size: 1.2em;
+            color: var(--dark-purple);
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            margin-bottom: 10px;
+        }
+
+        #probabilities {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        #probabilities li {
+            margin: 5px 10px;
+            background: rgba(255, 200, 87, 0.8);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            transition: all 0.3s ease-in-out, backdrop-filter 0.3s ease-in-out;
+        }
+
+        #probabilities li:hover {
+            background: var(--pink);
+            color: var(--white);
+            transform: scale(1.05);
+            backdrop-filter: blur(20px);
+        }
+
+        .spinner {
+            font-size: 1.5em;
+            animation: spin 1s linear infinite, pulse 2s infinite;
+            color: var(--dark-purple);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        #canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Emotion Recognition</h1>
+        <video id="video" width="640" height="480" autoplay></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+
+        <div id="prediction" class="hidden">
+            <i class="fas fa-brain spinner"></i>
+            Detecting...
+        </div>
+
+        <ul id="probabilities"></ul>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.2.0/socket.io.js"></script>
+        <script>
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const prediction = document.getElementById('prediction');
+            const probabilities = document.getElementById('probabilities');
+            const context = canvas.getContext('2d');
+
+            const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+            socket.on('connect', () => {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then((stream) => {
+                        video.srcObject = stream;
+                        video.play();
+
+                        const sendFrame = () => {
+                            context.drawImage(video, 0, 0, 640, 480);
+                            const frame_base64 = canvas.toDataURL('image/jpeg').split(',')[1];
+                            socket.emit('frame', frame_base64);
+                            setTimeout(sendFrame, 1000); // Send every second
+                        };
+
+                        sendFrame();
+                    })
+                    .catch((error) => {
+                        console.error('Error accessing webcam:', error);
+                    });
+            });
+
+            socket.on('prediction', (data) => {
+                prediction.classList.remove('hidden');
+                prediction.textContent = `Predicted emotion: ${data.emotion}`;
+
+                // Clear previous probabilities
+                probabilities.innerHTML = '';
+
+                // Add probabilities for each emotion
+                for (const [emotion, probability] of Object.entries(data.probabilities)) {
+                    const li = document.createElement('li');
+                    li.textContent = `${emotion}: ${probability.toFixed(2)}`;
+                    probabilities.appendChild(li);
+                }
+            });
+        </script>
+    </div>
+</body>
+</html>
